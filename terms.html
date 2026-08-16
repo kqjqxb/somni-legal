@@ -432,15 +432,34 @@
 
 <script>
   // WKWebView (react-native-webview on iOS) jumps to same-page #anchors
-  // natively, bypassing CSS scroll-behavior: smooth entirely. Doing the
-  // scroll ourselves via scrollIntoView works reliably everywhere instead.
+  // natively, bypassing CSS scroll-behavior: smooth entirely. Animating the
+  // scroll ourselves works reliably everywhere, and lets us pick a slower,
+  // more deliberate pace than the browser's own (fixed, fast) smooth scroll.
+  var SCROLL_DURATION_MS = 900;
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+  function smoothScrollTo(targetY) {
+    var startY = window.scrollY;
+    var distance = targetY - startY;
+    var startTime = null;
+    function step(now) {
+      if (startTime === null) startTime = now;
+      var elapsed = now - startTime;
+      var progress = Math.min(elapsed / SCROLL_DURATION_MS, 1);
+      window.scrollTo(0, startY + distance * easeInOutCubic(progress));
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
   document.querySelectorAll('a[href^="#"]').forEach(function (link) {
     link.addEventListener('click', function (e) {
       var id = this.getAttribute('href').slice(1);
       var target = id && document.getElementById(id);
       if (!target) return;
       e.preventDefault();
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var rect = target.getBoundingClientRect();
+      smoothScrollTo(window.scrollY + rect.top);
       if (history.pushState) history.pushState(null, '', '#' + id);
     });
   });
